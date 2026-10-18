@@ -4,7 +4,7 @@
 
 InstaPunch Bridge is open-source firmware for a small Bluetooth bridge. Flash it onto an M5Stack Atom Lite and [InstaPunch Mapper](https://instapunch.cn/mapper) on iPhone / iPad can talk to field devices that only support **classic Bluetooth serial (SPP)**, such as RTK receivers and laser rangefinders.
 
-> **Preview:** the firmware is still being tested. Flashing, booting and the serial commands are confirmed; connecting field devices and phones is still being verified on the board. Bridge support in InstaPunch Mapper is also in development. Until then, configure the bridge from the flasher page's console or a serial terminal.
+> **Preview:** tested on an M5Stack Atom Lite with a South Galaxy G1 and InstaPunch Mapper; other devices (such as the TruPulse 360B) are not tested yet. Configure it from Mapper's External Devices settings, or from the flasher page's console or a serial terminal.
 
 ## 1. What it does
 
@@ -36,7 +36,7 @@ In the field the bridge is powered over USB-C; a power bank works.
 ### Option 1: web flasher (recommended, nothing to install)
 
 1. Connect the Atom Lite to the computer with the USB-C data cable.
-2. Open the flasher page in desktop Chrome or Edge (address provided once published).
+2. Open the flasher page in desktop Chrome or Edge: <https://xiaonianpu.github.io/InstaPunch-Bridge/>
 3. Click “Install firmware”, pick the serial port (`usbserial-…` on macOS, `COM…` on Windows) and confirm.
 4. Wait about one minute until it finishes.
 

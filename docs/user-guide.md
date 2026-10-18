@@ -4,7 +4,7 @@
 
 InstaPunch Bridge 是一个开源的蓝牙中转盒固件。把它烧录到一块 M5Stack Atom Lite 上，就能让 iPhone / iPad 上的 [InstaPunch Mapper](https://instapunch.cn/mapper) 连接只支持**经典蓝牙串口（SPP）**的外业设备，例如 RTK 接收机和激光测距仪。
 
-> **预览版说明**：固件仍在测试中。目前已确认能烧录、启动并响应串口命令；连接外业设备和手机的功能还在开发板上验证。InstaPunch Mapper 中的 Bridge 支持也在开发中，在此之前请用烧录页面的控制台或串口命令配置。
+> **预览版说明**：已在 M5Stack Atom Lite 上与南方银河 G1 和 InstaPunch Mapper 实测可用；其他设备（如 TruPulse 360B）尚未测试。在 Mapper 的“外部设备”中配置，也可以用烧录页面的控制台或串口命令配置。
 
 ## 1. 它能做什么
 
@@ -36,7 +36,7 @@ InstaPunch Bridge 是一个开源的蓝牙中转盒固件。把它烧录到一�
 ### 方法一：网页烧录（推荐，不用装任何软件）
 
 1. 用 USB-C 数据线把 Atom Lite 接到电脑。
-2. 用桌面版 Chrome 或 Edge 打开烧录页面（发布后在此提供地址）。
+2. 用桌面版 Chrome 或 Edge 打开烧录页面：<https://xiaonianpu.github.io/InstaPunch-Bridge/>
 3. 点“烧录固件 / Install firmware”，在弹出的列表中选择串口（macOS 上名为 `usbserial-…`，Windows 上为 `COM…`），按提示确认。
 4. 等待完成，约 1 分钟。
 

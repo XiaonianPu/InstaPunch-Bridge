@@ -143,7 +143,7 @@ mac/build-app.sh debug --open
 
 1. 推送到 `main` 或提 PR 时，GitHub Actions（`.github/workflows/build.yml`）用 ESP-IDF v5.4.2 编译，生成 `instapunch-bridge-merged.bin`，连同 `web/` 打包为构件。
 2. 打 `v*` 标签时，合并镜像附到 GitHub Release。
-3. 网页烧录页 `web/index.html` + `manifest.json`（ESP Web Tools）需要 HTTPS 托管（计划 GitHub Pages），与镜像放在同一目录。`manifest.json` 的 `version` 与 `commands.h` 的 `BRIDGE_FIRMWARE_VERSION` 一起更新。
+3. 网页烧录页 `web/index.html` + `manifest.json`（ESP Web Tools）需要 HTTPS：推送到 `main` 时 CI 的 `pages` 任务把它们与合并镜像一起发布到 GitHub Pages（<https://xiaonianpu.github.io/InstaPunch-Bridge/>）。仓库 Settings › Pages 的 Source 须设为 “GitHub Actions”。`manifest.json` 的 `version` 与 `commands.h` 的 `BRIDGE_FIRMWARE_VERSION` 一起更新。
 
 分区表是单个 3 MB factory 分区，不带 OTA；当前固件约 0.9 MB。需要 OTA 时重新规划分区并确认体积。
 
@@ -164,4 +164,4 @@ CI 与网页烧录页尚未实际运行过。
 - 开发板上验证 SPP、配对、扫描、BLE 订阅与收帧、拒绝第二台手机、`unbind`、NVS 重启保留、ack 重发。
 - InstaPunch Mapper 端：连接、扫描、配对与解析。
 - 状态灯目前只区分手机是否连接，SPP 槽位状态尚未显示；按键（G39）用途待定。
-- 网页烧录页上线（GitHub Pages）与 CI 首次运行。
+- 确认 CI 首次运行与 GitHub Pages 发布成功。

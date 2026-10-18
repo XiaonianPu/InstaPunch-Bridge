@@ -7,8 +7,9 @@ Open-source Bluetooth bridge firmware: an original ESP32 connects to classic-Blu
 | 项 | 内容 |
 |---|---|
 | 推荐硬件 | M5Stack Atom Lite（ESP32-PICO-D4），无需焊接，一根 USB-C 线即可 |
-| 下游 | 任意经典蓝牙 SPP 设备，2 个槽位；已计划测试南方银河 G1 RTK、TruPulse 360B 激光测距 |
+| 下游 | 任意经典蓝牙 SPP 设备，2 个槽位；已实测南方银河 G1 RTK，计划测试 TruPulse 360B 激光测距 |
 | 上游 | InstaPunch Mapper（BLE 协议见 [docs/protocol.md](docs/protocol.md)） |
+| 烧录 | [https://xiaonianpu.github.io/InstaPunch-Bridge/](https://xiaonianpu.github.io/InstaPunch-Bridge/)（桌面版 Chrome / Edge） |
 | 手册 | [使用手册](docs/user-guide.md) · [User Guide](docs/user-guide.en.md) · [开发手册](docs/development.md) |
 
 只能用**初代 ESP32**。S2 / S3 / C / H 系列（如 AtomS3、XIAO ESP32C3）没有经典蓝牙。
@@ -16,9 +17,9 @@ Open-source Bluetooth bridge firmware: an original ESP32 connects to classic-Blu
 ## 用户：烧录固件（不需要安装任何开发工具）
 
 1. 用 USB-C **数据线**把 Atom Lite 接到电脑。
-2. 用桌面版 Chrome 或 Edge 打开烧录页面（GitHub Pages 发布后填入地址），点击“烧录固件”，选择出现的串口。
+2. 用桌面版 Chrome 或 Edge 打开[烧录页面](https://xiaonianpu.github.io/InstaPunch-Bridge/)，点击“烧录固件”，选择出现的串口。
 3. 打开 InstaPunch Mapper 连接 `InstaPunch-Bridge-XXXX`。第一台配对的手机成为这台中转盒的主人，其他手机连不上。
-4. 在 App 里扫描设备，绑定到槽位 1 或 2，并在 App 中设置每个槽位是什么设备（App 端开发中）。也可以在烧录页面的 “Logs & Console” 中用命令操作：
+4. 在 App 的“外部设备”里扫描设备，绑定到槽位 1 或 2，并设置每个槽位是 RTK 还是测距仪。也可以在烧录页面的 “Logs & Console” 中用命令操作：
 
    ```
    scan
@@ -61,9 +62,9 @@ Atom Lite 在高波特率下烧录偶尔失败，失败时用 115200。Atom Lite
 5. [x] 协议 v1 帧：`line` / `raw` 双模式、GAP / REPLAY / AGE / PARTIAL 标志、会话号与帧序号、离线暂存与 ack 重发、上行整条记录（`main/frame.c`，主机测试通过）
 6. [x] 发送闸门（加密、订阅、拥塞、在途包数）与丢弃事件（`main/pipeline.c`）
 7. [x] USB 串口命令（与 BLE 控制命令共用）
-8. [x] 网页烧录（ESP Web Tools）与 CI 构建配置
-9. [ ] 上 Atom Lite 实测：2026-10-18 已烧录，启动和 USB 串口 `info` / `status` 正常（[记录](validation/2026-10-18-first-flash/README.md)）；SPP、BLE 与手机联调未测，网页烧录页与 CI 未运行
-10. [ ] InstaPunch Mapper 端的连接、扫描、配对与解析
+8. [x] 网页烧录（ESP Web Tools）与 CI：推送到 `main` 自动编译并发布到 GitHub Pages
+9. [x] 上 Atom Lite 实测：与银河 G1、InstaPunch Mapper 连通可用（2026-10-18，[记录](validation/2026-10-18-first-flash/README.md)）；TruPulse 未测
+10. [x] InstaPunch Mapper 端的连接、扫描、配对与解析
 11. [ ] RGB 灯显示状态：手机未连接慢闪（1 秒亮 / 1 秒灭），连接后每 3 秒快闪；SPP 槽位状态未显示
 
 ## 测试

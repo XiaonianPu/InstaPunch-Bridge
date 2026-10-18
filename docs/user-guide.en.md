@@ -21,7 +21,7 @@ InstaPunch Bridge is open-source firmware for a small Bluetooth bridge. Flash it
 
 | Item | Notes |
 |---|---|
-| M5Stack Atom Lite | Recommended, no soldering. Other **original ESP32** boards also work |
+| [M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit) | Recommended, no soldering. Other **original ESP32** boards also work |
 | USB-C **data** cable | Charge-only cables cannot flash |
 | Computer with desktop Chrome or Edge | Only for flashing and setup |
 | iPhone / iPad | With InstaPunch Mapper |

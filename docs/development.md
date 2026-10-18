@@ -4,7 +4,7 @@
 
 项目约定见 [AGENTS.md](../AGENTS.md)，BLE 协议见 [protocol.md](protocol.md)，给最终用户的说明见 [使用手册](user-guide.md)。
 
-状态（2026-10-18）：固件已在 Atom Lite 上启动，USB 命令可用；SPP、BLE 与手机联调尚未在开发板上验证。Mac 测试转发器已与银河 G1、iPhone 连通。
+状态（2026-10-18）：已在 Atom Lite 上与银河 G1、InstaPunch Mapper 实测可用；TruPulse 360B 未测。Mac 测试转发器已与银河 G1、iPhone 连通。
 
 ## 1. 它做什么
 
@@ -71,7 +71,7 @@ BLE 绑定（主人）由 Bluedroid 自己存在 NVS 中。`forget` 只清设备
 
 ## 3. 开发环境
 
-只能用初代 ESP32（双模）。S2 / S3 / C / H 系列没有经典蓝牙。推荐 M5Stack Atom Lite（ESP32-PICO-D4，4 MB flash，无 PSRAM）。
+只能用初代 ESP32（双模）。S2 / S3 / C / H 系列没有经典蓝牙。推荐 [M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit)（ESP32-PICO-D4，4 MB flash，无 PSRAM）。
 
 1. 安装 ESP-IDF v5.4.2（[官方说明](https://docs.espressif.com/projects/esp-idf/en/v5.4.2/esp32/get-started/)），运行 `install.sh esp32`。macOS 上还需 `python tools/idf_tools.py install cmake ninja`。
 2. 如果系统默认 `python3` 比安装 ESP-IDF 时用的新，写一个包装脚本：先把指向旧版 Python 的目录放到 `PATH` 前面，再加载 `export.sh`。之后终端和 CLion 都加载这个脚本。

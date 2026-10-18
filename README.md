@@ -6,7 +6,7 @@ Open-source Bluetooth bridge firmware: an original ESP32 connects to classic-Blu
 
 | 项 | 内容 |
 |---|---|
-| 推荐硬件 | M5Stack Atom Lite（ESP32-PICO-D4），无需焊接，一根 USB-C 线即可 |
+| 推荐硬件 | [M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit)（ESP32-PICO-D4），无需焊接，一根 USB-C 线即可 |
 | 下游 | 任意经典蓝牙 SPP 设备，2 个槽位；已实测南方银河 G1 RTK，计划测试 TruPulse 360B 激光测距 |
 | 上游 | InstaPunch Mapper（BLE 协议见 [docs/protocol.md](docs/protocol.md)） |
 | 烧录 | [https://xiaonianpu.github.io/InstaPunch-Bridge/](https://xiaonianpu.github.io/InstaPunch-Bridge/)（桌面版 Chrome / Edge） |

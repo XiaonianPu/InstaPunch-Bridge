@@ -21,7 +21,7 @@ InstaPunch Bridge 是一个开源的蓝牙中转盒固件。把它烧录到一�
 
 | 物品 | 说明 |
 |---|---|
-| M5Stack Atom Lite | 推荐，无需焊接。也可用其他**初代 ESP32** 开发板 |
+| [M5Stack Atom Lite](https://shop.m5stack.com/products/atom-lite-esp32-development-kit) | 推荐，无需焊接。也可用其他**初代 ESP32** 开发板 |
 | USB-C **数据线** | 只能充电的线无法烧录 |
 | 电脑 + 桌面版 Chrome 或 Edge | 只在烧录和设置时需要 |
 | iPhone / iPad | 安装 InstaPunch Mapper |

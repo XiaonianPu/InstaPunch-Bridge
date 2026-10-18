@@ -1,0 +1,11 @@
+{
+  "name": "InstaPunch Bridge",
+  "version": "0.1.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [{ "path": "instapunch-bridge-merged.bin", "offset": 0 }]
+    }
+  ]
+}

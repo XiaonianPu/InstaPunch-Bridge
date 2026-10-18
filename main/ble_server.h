@@ -1,0 +1,27 @@
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+#include "bridge_config.h"
+#include "esp_err.h"
+
+typedef void (*ble_command_cb)(const char *line);
+
+// GATT server for the phone (docs/protocol.md). Every characteristic needs an
+// encrypted link, and only the first phone that bonds (the owner) may bond;
+// `unbind` over USB clears it. Bluedroid must be enabled.
+// Link state, MTU, uplink frames and notify completions go to pipeline.c.
+esp_err_t ble_server_start(ble_command_cb on_command);
+
+// Notifies one finished downlink frame (frame.h). ESP_OK means it was queued;
+// pipeline_notify_done() follows.
+esp_err_t ble_server_notify_data(const uint8_t *frame, size_t len);
+
+// Notifies one line on the control characteristic, truncated to MTU - 3.
+void ble_server_send_control(const char *line);
+
+// "phone <mac> connected" / "phone <mac> idle" / "phone none".
+void ble_server_status(char *out, size_t size);
+
+// Removes every BLE bond so the next phone to pair becomes the owner.
+esp_err_t ble_server_unbind_all(void);

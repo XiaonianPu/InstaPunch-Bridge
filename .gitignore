@@ -1,0 +1,16 @@
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+.DS_Store
+build.log
+test/test_frame
+test/test_frame.dSYM/
+
+# Mac test relay
+mac/.build/
+mac/build/
+
+# IDE (CLion)
+.idea/
+cmake-build-*/

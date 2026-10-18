@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InstaPunch Bridge 烧录</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"></script>
+  <style>
+    :root { --bg: #fafaf8; --fg: #1d1d1b; --muted: #6b6b66; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ececea; --muted: #9a9a95; } }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, "PingFang SC", system-ui, sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 48px 16px; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    p, li { color: var(--muted); }
+    ol { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>InstaPunch Bridge</h1>
+    <p>把 RTK、激光测距等经典蓝牙设备转为 BLE，供 InstaPunch Mapper 连接。<br>
+       Turns classic-Bluetooth field devices into BLE for InstaPunch Mapper.</p>
+    <ol>
+      <li>用 USB-C 数据线把 M5Stack Atom Lite 接到电脑。<br>Connect the M5Stack Atom Lite over USB-C.</li>
+      <li>在桌面版 Chrome 或 Edge 中点击下方按钮，选择出现的串口。<br>In desktop Chrome or Edge, click the button and pick the serial port.</li>
+      <li>烧录完成后，用 InstaPunch Mapper 连接 <code>InstaPunch-Bridge-XXXX</code> 并选择设备；也可在“Logs &amp; Console”中输入 <code>scan</code>、<code>pair 1 &lt;MAC&gt; [PIN]</code>。<br>After flashing, connect to <code>InstaPunch-Bridge-XXXX</code> from InstaPunch Mapper, or use <code>scan</code> / <code>pair</code> in “Logs &amp; Console”.</li>
+    </ol>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">烧录固件 / Install firmware</button>
+      <span slot="unsupported">请使用桌面版 Chrome 或 Edge。Please use desktop Chrome or Edge.</span>
+      <span slot="not-allowed">需要通过 HTTPS 打开本页。This page must be served over HTTPS.</span>
+    </esp-web-install-button>
+  </main>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>BridgeMac</string>
+	<key>CFBundleIdentifier</key>
+	<string>cn.instapunch.bridge-mac</string>
+	<key>CFBundleName</key>
+	<string>InstaPunch Bridge Mac</string>
+	<key>CFBundleDisplayName</key>
+	<string>InstaPunch Bridge（Mac 测试）</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>作为测试用蓝牙中转盒：连接下游 BLE 设备，并向 InstaPunch Mapper 提供 Bridge 服务。</string>
+</dict>
+</plist>

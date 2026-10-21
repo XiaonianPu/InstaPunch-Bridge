@@ -1,4 +1,5 @@
-CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined
+# _DEFAULT_SOURCE: glibc only declares strlcpy / strlcat outside strict -std=c11 (macOS always does).
+CFLAGS ?= -std=c11 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined
 
 test: test_frame test_links
 	./test_frame

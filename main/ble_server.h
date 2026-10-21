@@ -9,7 +9,7 @@ typedef void (*ble_command_cb)(const char *line);
 
 // GATT server for the phone (docs/protocol.md). Every characteristic needs an
 // encrypted link, and only the first phone that bonds (the owner) may bond;
-// `unbind` over USB clears it. Bluedroid must be enabled.
+// `unbind` (USB, or the owner over BLE) or a 10 s button press clears it. Bluedroid must be enabled.
 // Link state, MTU, uplink frames and notify completions go to pipeline.c.
 esp_err_t ble_server_start(ble_command_cb on_command);
 
@@ -26,5 +26,6 @@ bool ble_server_snapshot_ready(uint32_t *generation);
 // "phone <mac> connected" / "phone <mac> idle" / "phone none".
 void ble_server_status(char *out, size_t size);
 
-// Removes every BLE bond so the next phone to pair becomes the owner.
+// Removes every BLE bond so the next phone to pair becomes the owner. A
+// connected phone is dropped about 1 s later, after the reply has gone out.
 esp_err_t ble_server_unbind_all(void);

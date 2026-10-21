@@ -4,7 +4,7 @@ import Foundation
 // from the phone's control characteristic and from the GUI console (`usb`).
 // Addition: `pair <slot> virtual` binds a GUI-fed virtual device.
 
-let firmwareVersion = "0.1.1-mac"
+let firmwareVersion = "0.1.2-mac"
 let protocolVersion = 1
 
 final class Commands {
@@ -112,7 +112,7 @@ final class Commands {
                 return
             }
             pipeline.ack(slot: slot, epoch: UInt8(truncatingIfNeeded: e), seq: UInt8(truncatingIfNeeded: s))
-        case "unbind" where usb:
+        case "unbind":
             phone.unbind()
             reply("ok")
         case "monitor" where usb:

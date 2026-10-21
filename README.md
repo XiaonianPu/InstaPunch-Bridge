@@ -27,7 +27,7 @@ Open-source Bluetooth bridge firmware: an original ESP32 connects to classic-Blu
    status
    ```
 
-   命令列表见 [docs/protocol.md](docs/protocol.md#5-控制命令与事件)。换手机时，在串口里输入 `unbind` 清除主人。
+   命令列表见 [docs/protocol.md](docs/protocol.md#5-控制命令与事件)。换手机时，在 App 的中转盒详情中点“解除绑定”，或长按盒子按键 10 秒（同时清除槽位设备），或在串口里输入 `unbind`。
 
 不想用浏览器时，可以从 Releases 下载 `instapunch-bridge-merged.bin`，用 esptool 写到地址 0：
 

@@ -15,19 +15,37 @@ static const char *TAG = "led";
 #define IDLE_OFF_MS 1000
 #define LINKED_ON_MS 80
 #define LINKED_PERIOD_MS 3000
+#define RESET_FLASHES 6
+#define RESET_FLASH_MS 100
 
 static rmt_channel_handle_t s_channel;
 static rmt_encoder_handle_t s_encoder;
 static TaskHandle_t s_task;
 static volatile bool s_connected;
+static volatile bool s_reset_flash;
 
-static void show(bool on)
+static void show_grb(uint8_t g, uint8_t r, uint8_t b)
 {
-    // SK6812 takes G, R, B, most significant bit first. Blue.
-    uint8_t grb[3] = {0, 0, on ? LED_LEVEL : 0};
+    // SK6812 takes G, R, B, most significant bit first.
+    uint8_t grb[3] = {g, r, b};
     rmt_transmit_config_t tx = {.loop_count = 0};
     if (rmt_transmit(s_channel, s_encoder, grb, sizeof(grb), &tx) == ESP_OK) {
         rmt_tx_wait_all_done(s_channel, 100);
+    }
+}
+
+static void show(bool on)
+{
+    show_grb(0, 0, on ? LED_LEVEL : 0); // blue
+}
+
+static void flash_reset(void)
+{
+    for (int i = 0; i < RESET_FLASHES; i++) {
+        show_grb(LED_LEVEL / 2, LED_LEVEL, 0); // amber
+        vTaskDelay(pdMS_TO_TICKS(RESET_FLASH_MS));
+        show_grb(0, 0, 0);
+        vTaskDelay(pdMS_TO_TICKS(RESET_FLASH_MS));
     }
 }
 
@@ -40,6 +58,10 @@ static bool wait(uint32_t ms)
 static void led_task(void *arg)
 {
     for (;;) {
+        if (s_reset_flash) {
+            s_reset_flash = false;
+            flash_reset();
+        }
         bool connected = s_connected;
         show(true);
         if (wait(connected ? LINKED_ON_MS : IDLE_ON_MS)) {
@@ -79,6 +101,14 @@ void status_led_set_phone(bool connected)
         return;
     }
     s_connected = connected;
+    if (s_task) {
+        xTaskNotifyGive(s_task);
+    }
+}
+
+void status_led_flash_reset(void)
+{
+    s_reset_flash = true;
     if (s_task) {
         xTaskNotifyGive(s_task);
     }

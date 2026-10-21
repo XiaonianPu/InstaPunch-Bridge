@@ -113,7 +113,7 @@ Apple clang / gcc，`-Wall -Wextra -Werror`，ASan + UBSan。改 `main/frame.c` 
 1. 启动日志、`info`、`status`。
 2. `scan` 找设备，`pair 1 <MAC> [PIN]`，`monitor on` 看设备数据是否进来。
 3. 手机用 nRF Connect 连 `InstaPunch-Bridge-XXXX`：订阅数据特征值，确认帧头（槽位、标志、会话号、帧序号）与负载；写控制特征值 `status`。
-4. 第二台手机应被拒绝配对；USB `unbind` 后可换手机。
+4. 第二台手机应被拒绝配对；USB 或 BLE `unbind`、长按按键 10 秒后可换手机（按键还应清空两个槽位）。
 5. `hold 1 on` 后取消订阅再订阅，应收到带 `REPLAY` / `AGE` 的补发帧；写 `ack` 后不再重发已确认的帧。
 6. 设备关机再开机应自动重连，`epoch` 加 1。
 
@@ -133,7 +133,7 @@ mac/build-app.sh debug --open
 
 - **协议**：事实来源是 [protocol.md](protocol.md)。改 UUID、帧格式、特征值或命令语义时提升协议版本（`info` 返回的 `proto`），由维护者确认 InstaPunch Mapper 端兼容；发布后旧版本 App 仍要能连。
 - **用户配置**一律运行时写 NVS，经命令修改；不要做成编译期选项或 menuconfig 项。
-- **安全**：只认已绑定的手机；`unbind` 只能走 USB；不加 BLE 上的解绑或免加密特征值。
+- **安全**：只认已绑定的手机；清除主人只经 USB `unbind`、主人手机在加密链路上发送的 `unbind`、或长按按键 10 秒（2026-10-22 用户决定）；不加免加密特征值。
 - **命名**：自己的符号加 `bridge_` 前缀或设为 `static`（Bluedroid 导出了 `config_save` 等通用名字）。
 - **Mac 转发器**：改协议、调度或命令时两边同步；无法一致的地方写进 `mac/README.md` 的差异表。
 - **开源**：不提交设备序列号、真实 MAC、PIN、个人信息或密钥。示例用 `00:80:25:aa:bb:cc`。注意有的设备名就是序列号（如银河 G1），`$GPXXX` 语句里也带序列号。

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "links.h"
 
-#define BRIDGE_FIRMWARE_VERSION "0.1.1"
+#define BRIDGE_FIRMWARE_VERSION "0.1.2"
 #define BRIDGE_PROTOCOL_VERSION 1
 
 // Text commands shared by the USB console and the BLE control characteristic

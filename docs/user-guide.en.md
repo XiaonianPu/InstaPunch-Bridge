@@ -57,7 +57,7 @@ Setup is done by typing commands in a console:
 - Web flasher page: connect and choose **Logs & Console**.
 - Or any serial terminal at 115200 baud; end each command with Enter.
 
-Type `info`. The reply `bridge 0.1.0 proto 1 slots 2` means the firmware is running.
+Type `info`. The reply `bridge 0.1.2 proto 1 slots 2` means the firmware is running.
 
 ## 4. Connecting your phone the first time
 
@@ -107,11 +107,16 @@ Tell InstaPunch Mapper what each slot is (RTK, rangefinder, …). The bridge its
 
 ## 7. Switching phones
 
-For security, the owner can only be cleared over USB:
+First clear the owner in any of these ways:
 
-1. Connect the bridge to a computer, open the console and type `unbind`; it replies `ok`.
-2. On the **old phone**, open Settings › Bluetooth, find `InstaPunch-Bridge-XXXX`, tap ⓘ and choose “Forget This Device”.
-3. Connect with the new phone; once paired it is the new owner.
+- **In the app**: on the current owner phone, open External Devices in InstaPunch Mapper, open this bridge and tap Unbind. The slot devices stay on the bridge.
+- **Hold the button for 10 s**: press and hold the button on the front; after about 10 s the LED flashes amber six times quickly and you can let go. This clears the owner phone and the devices in both slots (and every classic-Bluetooth pairing the bridge keeps); data mode and offline hold settings are kept. Use this when the old phone is lost or broken.
+- **USB**: connect the bridge to a computer, open the console and type `unbind`; it replies `ok`. Only the owner phone is cleared.
+
+Then:
+
+1. On the **old phone**, open Settings › Bluetooth, find `InstaPunch-Bridge-XXXX`, tap ⓘ and choose “Forget This Device”. Otherwise the old phone reports a pairing failure when it connects again.
+2. Connect with the new phone; once paired it is the new owner.
 
 Do the same if the same phone was reset or forgot the bridge in its Bluetooth settings.
 
@@ -127,7 +132,7 @@ Do the same if the same phone was reset or forgot the bridge in its Bluetooth se
 | `forget <slot>` | Remove the slot's device |
 | `mode <slot> line\|raw` | Data mode |
 | `hold <slot> on\|off` | Offline hold |
-| `unbind` | Clear the owner phone (USB only) |
+| `unbind` | Clear the owner phone (USB, or the owner phone through the app) |
 | `monitor on\|off` | Show device data in the console (USB only) |
 
 ## 9. Troubleshooting
@@ -148,7 +153,7 @@ By design: a bridge serves one phone. See section 7.
 Its name is `InstaPunch-Bridge-XXXX` and it advertises the service UUID `A7B750D5-8CE4-4F67-B586-8C1AA7800BBF`.
 
 **What does the LED mean?**
-Blue, on 1 s / off 1 s: no phone connected, waiting. A short flash every 3 s: phone connected. Completely dark: no power or the firmware is not running. The button has no function yet.
+Blue, on 1 s / off 1 s: no phone connected, waiting. A short flash every 3 s: phone connected. Completely dark: no power or the firmware is not running. Six fast amber flashes after holding the button for 10 s: the owner phone and every device binding were cleared (section 7).
 
 **Which devices are supported?**
 In principle any classic-Bluetooth SPP device. Planned tests: South Galaxy G1 RTK and TruPulse 360B rangefinder. BLE-only devices do not need the bridge; Mapper can connect to them directly.

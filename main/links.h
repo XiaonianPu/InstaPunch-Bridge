@@ -18,6 +18,9 @@ esp_err_t links_start(links_data_cb on_data);
 // and applies it immediately: the old link is dropped and the new one dialled.
 esp_err_t links_set_device(bridge_slot_t slot, const bridge_device_t *device);
 
+// Clears both slots and removes every classic-Bluetooth bond.
+esp_err_t links_forget_all(void);
+
 // Writes uplink data (e.g. RTCM) to the slot's device. Fails when not connected.
 esp_err_t links_write(bridge_slot_t slot, const uint8_t *data, size_t len);
 

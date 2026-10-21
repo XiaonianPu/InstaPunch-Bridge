@@ -625,6 +625,25 @@ esp_err_t links_set_device(bridge_slot_t slot, const bridge_device_t *device)
     return ESP_OK;
 }
 
+esp_err_t links_forget_all(void)
+{
+    esp_err_t result = ESP_OK;
+    for (int i = 0; i < BRIDGE_SLOT_COUNT; i++) {
+        esp_err_t err = links_set_device((bridge_slot_t)i, NULL);
+        if (err != ESP_OK) result = err;
+    }
+    // Bonds left over from devices that were never bound to a slot, or were rebound since.
+    int count = esp_bt_gap_get_bond_device_num();
+    esp_bd_addr_t *list = count > 0 ? calloc(count, sizeof(*list)) : NULL;
+    if (list && esp_bt_gap_get_bond_device_list(&count, list) == ESP_OK) {
+        for (int i = 0; i < count; i++) {
+            esp_bt_gap_remove_bond_device(list[i]);
+        }
+    }
+    free(list);
+    return result;
+}
+
 esp_err_t links_write(bridge_slot_t slot, const uint8_t *data, size_t len)
 {
     lock();

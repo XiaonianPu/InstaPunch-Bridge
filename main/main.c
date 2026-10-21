@@ -9,6 +9,7 @@
 #include "links.h"
 #include "nvs_flash.h"
 #include "pipeline.h"
+#include "reset_button.h"
 #include "status_led.h"
 
 static const char *TAG = "bridge";
@@ -53,6 +54,7 @@ void app_main(void)
     ESP_ERROR_CHECK(ble_server_start(on_ble_command));
     ESP_ERROR_CHECK(links_start(on_device_data));
     bridge_command_start_publisher();
+    reset_button_start();
     console_start();
     ESP_LOGI(TAG, "free heap %u bytes, minimum %u", (unsigned)esp_get_free_heap_size(),
              (unsigned)esp_get_minimum_free_heap_size());

@@ -162,7 +162,8 @@ void bridge_command_run(char *line, bridge_reply_fn reply, bool usb)
         set_option(save, reply, false);
     } else if (strcmp(cmd, "ack") == 0) {
         ack(save, reply);
-    } else if (usb && strcmp(cmd, "unbind") == 0) {
+    } else if (strcmp(cmd, "unbind") == 0) {
+        // Over BLE only the owner can be here: every characteristic needs the bonded, encrypted link.
         reply(ble_server_unbind_all() == ESP_OK ? "ok" : "error unbind failed");
     } else if (usb && strcmp(cmd, "monitor") == 0) {
         char *arg = strtok_r(NULL, " \t", save);

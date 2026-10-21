@@ -90,6 +90,7 @@ static uint16_t s_mtu = 23;
 static bool s_notify_data;
 static bool s_notify_control;
 static TimerHandle_t s_pairing_timer;
+static TimerHandle_t s_unbind_timer;
 
 #define CONTROL_QUEUE_SIZE 96
 static QueueHandle_t s_control_queue;
@@ -203,6 +204,13 @@ static void configure_advertising(void)
     rsp[1] = ESP_BLE_AD_TYPE_NAME_CMPL;
     memcpy(&rsp[2], s_name, name_len);
     esp_ble_gap_config_scan_rsp_data_raw(rsp, (uint32_t)(name_len + 2));
+}
+
+static void unbind_disconnect(TimerHandle_t timer)
+{
+    if (s_connected) {
+        esp_ble_gap_disconnect(s_peer);
+    }
 }
 
 static void pairing_timeout(TimerHandle_t timer)
@@ -407,7 +415,8 @@ esp_err_t ble_server_unbind_all(void)
     }
     free(list);
     if (s_connected) {
-        esp_ble_gap_disconnect(s_peer);
+        // Let the `ok` reach the phone before the link drops.
+        xTimerStart(s_unbind_timer, 0);
     }
     return ESP_OK;
 }
@@ -420,6 +429,7 @@ esp_err_t ble_server_start(ble_command_cb on_command)
     if (!s_control_lock || !s_control_queue) return ESP_ERR_NO_MEM;
     if (xTaskCreate(control_task, "ble_control", 3072, NULL, 5, NULL) != pdPASS) return ESP_ERR_NO_MEM;
     s_pairing_timer = xTimerCreate("ble_pair", PAIRING_TIMEOUT, pdFALSE, NULL, pairing_timeout);
+    s_unbind_timer = xTimerCreate("ble_unbind", pdMS_TO_TICKS(1000), pdFALSE, NULL, unbind_disconnect);
 
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_BT);

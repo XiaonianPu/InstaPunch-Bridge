@@ -40,3 +40,6 @@ esp_err_t links_scan(bridge_reply_fn reply);
 // Classic-Bluetooth devices bonded with the bridge:
 //   paired <mac> <slot|-> <name>   ...   paired done
 void links_paired(bridge_reply_fn reply);
+
+// Non-disruptive RAM snapshot: devices begin, found/seen pairs, devices done.
+void links_cached(bridge_reply_fn reply);

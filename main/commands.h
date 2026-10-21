@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "links.h"
 
-#define BRIDGE_FIRMWARE_VERSION "0.1.0"
+#define BRIDGE_FIRMWARE_VERSION "0.1.1"
 #define BRIDGE_PROTOCOL_VERSION 1
 
 // Text commands shared by the USB console and the BLE control characteristic
@@ -20,3 +20,5 @@ bool bridge_command_monitoring(void);
 
 // Applies the stored mode / hold options of every slot to the pipeline.
 void bridge_command_load_options(void);
+
+void bridge_command_start_publisher(void);

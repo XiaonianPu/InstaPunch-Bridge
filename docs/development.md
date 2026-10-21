@@ -43,7 +43,7 @@ Bridge 是一个蓝牙中转盒：初代 ESP32 用经典蓝牙 SPP 连接外业�
 
 - `pipeline.c` 有一个泵任务（10 ms 周期，或被事件唤醒），独占所有槽位缓冲。蓝牙回调只投递事件，并持锁调用 `pipeline_*`。
 - `pipeline.c` 不会在持有自己锁的同时等待 `links.c` 的锁；调用方也不要在持有 links 锁时调用 pipeline。
-- `links.c` 一次只做一个 SDP / 连接（`ESP_SPP_DISCOVERY_COMP_EVT` 不带对端地址）；有扫描请求时等当前拨号结束，扫描期间断开所有槽位。失败 5 秒后重试，拨号 30 秒超时。
+- `links.c` 一次只做一个 SDP / 连接（`ESP_SPP_DISCOVERY_COMP_EVT` 不带对端地址）；有扫描请求时等当前拨号结束，扫描期间断开所有槽位。失败 5 秒后重试；30 秒报告拨号缓慢，继续保留请求归属直到协议栈终结回调，避免迟到结果污染下一次拨号。
 
 ### 关键参数
 
@@ -165,3 +165,9 @@ CI 与网页烧录页尚未实际运行过。
 - InstaPunch Mapper 端：连接、扫描、配对与解析。
 - 状态灯目前只区分手机是否连接，SPP 槽位状态尚未显示；按键（G39）用途待定。
 - 确认 CI 首次运行与 GitHub Pages 发布成功。
+
+## 2026-10-19：缓存推送与重连 / Cache and reconnect
+
+`device_cache.c` 保存 24 条 RAM 发现记录；`commands.c` 独立任务每 5 秒推送 `devices` / `status` / `paired`，由 `ble_server.c` 有界控制队列发送。`links.c` 保留 SDP 请求归属直到终结回调，缓存 RFCOMM 通道并轮换重试槽位。`make -C test` 包含真实 links.c 回调的模拟 SDK 场景，不代表射频测试。验证见 `validation/2026-10-19-spp-cache/`。
+
+The bounded control queue sends periodic RAM snapshots without inquiry. Callback tests exercise production link code against mocked IDF calls; they do not establish radio reliability.

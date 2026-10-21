@@ -17,8 +17,11 @@ esp_err_t ble_server_start(ble_command_cb on_command);
 // pipeline_notify_done() follows.
 esp_err_t ble_server_notify_data(const uint8_t *frame, size_t len);
 
-// Notifies one line on the control characteristic, truncated to MTU - 3.
+// Queues one complete control line; retry on congestion/API failure, no truncation.
 void ble_server_send_control(const char *line);
+
+// Publisher admission: subscribed/encrypted, sufficient MTU, empty control queue.
+bool ble_server_snapshot_ready(uint32_t *generation);
 
 // "phone <mac> connected" / "phone <mac> idle" / "phone none".
 void ble_server_status(char *out, size_t size);

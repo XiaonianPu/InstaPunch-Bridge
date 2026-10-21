@@ -20,6 +20,8 @@ final class Bridge {
     private(set) var links: DeviceLinks!
     private(set) var commands: Commands!
     private var publisher: DispatchSourceTimer?
+    private var lastPush = Date.distantPast
+    private var pushGeneration = -1
 
     init(publish: @escaping (Snapshot) -> Void) {
         queue.async { [self] in
@@ -53,6 +55,13 @@ final class Bridge {
             t.schedule(deadline: .now(), repeating: .milliseconds(250))
             t.setEventHandler { [weak self] in
                 guard let self else { return }
+                if phone.canPublishSnapshot, pushGeneration != phone.controlGeneration || Date().timeIntervalSince(lastPush) >= 5 {
+                    links.cachedDevices(reply: phone.sendControl)
+                    commands.status(phone.sendControl)
+                    links.paired(reply: phone.sendControl)
+                    lastPush = Date()
+                    pushGeneration = phone.controlGeneration
+                }
                 let s = self.snapshot()
                 DispatchQueue.main.async { publish(s) }
             }

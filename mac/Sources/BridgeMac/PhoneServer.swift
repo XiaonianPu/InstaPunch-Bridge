@@ -26,7 +26,9 @@ final class PhoneServer: NSObject, CBPeripheralManagerDelegate, PipelinePhone {
     static let uplinkUUID = CBUUID(string: "381B0BF7-5C19-4CCB-BF37-BC4214560D5A")
     static let controlUUID = CBUUID(string: "FC838A35-6BDB-4571-A93B-E1D2E538DECD")
     static let localName = "InstaPunch-Bridge-Mac"
-    static let controlBacklogMax = 64
+    static let controlBacklogMax = 96
+    private(set) var controlGeneration = 0
+    var canPublishSnapshot: Bool { controlSubscribed && (ownerCentral?.maximumUpdateValueLength ?? 0) >= 128 && controlBacklog.isEmpty }
 
     let pipeline: Pipeline
     var onCommand: ((String, @escaping (String) -> Void) -> Void)?
@@ -163,7 +165,11 @@ final class PhoneServer: NSObject, CBPeripheralManagerDelegate, PipelinePhone {
         log(.control, "→ \(line)")
         guard controlSubscribed, ownerCentral != nil else { return }
         let limit = max(ownerCentral?.maximumUpdateValueLength ?? 20, 20)
-        let data = Data(line.utf8.prefix(limit))
+        guard line.utf8.count <= limit else {
+            log(.phone, "控制消息超过 MTU，拒绝截断")
+            return
+        }
+        let data = Data(line.utf8)
         if !controlBacklog.isEmpty || !pushControl(data) {
             if controlBacklog.count < Self.controlBacklogMax {
                 controlBacklog.append(data)
@@ -212,6 +218,7 @@ final class PhoneServer: NSObject, CBPeripheralManagerDelegate, PipelinePhone {
             dataSubscribed = true
             log(.phone, "手机订阅下行数据，MTU \(central.maximumUpdateValueLength + 3)")
         } else if characteristic.uuid == Self.controlUUID {
+            if !controlSubscribed { controlGeneration += 1 }
             controlSubscribed = true
             log(.phone, "手机订阅控制")
         }

@@ -6,6 +6,8 @@ managed_components/
 build.log
 test/test_frame
 test/test_frame.dSYM/
+test/test_links
+test/test_links.dSYM/
 
 # Mac test relay
 mac/.build/

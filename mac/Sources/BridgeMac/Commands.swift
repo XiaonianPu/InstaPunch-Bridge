@@ -4,7 +4,7 @@ import Foundation
 // from the phone's control characteristic and from the GUI console (`usb`).
 // Addition: `pair <slot> virtual` binds a GUI-fed virtual device.
 
-let firmwareVersion = "0.1.0-mac"
+let firmwareVersion = "0.1.1-mac"
 let protocolVersion = 1
 
 final class Commands {
@@ -55,6 +55,8 @@ final class Commands {
             reply("bridge \(firmwareVersion) proto \(protocolVersion) slots \(slotCount)")
         case "status":
             status(reply)
+        case "devices":
+            links.cachedDevices(reply: reply)
         case "scan":
             if !links.scan(reply: reply) {
                 reply("error scan already running")
@@ -115,7 +117,7 @@ final class Commands {
             links.monitor = arg(1) == "on"
             reply("ok")
         default:
-            reply(usb ? "commands: info | status | scan | paired | pair <slot> <mac> [pin] | forget <slot> | "
+            reply(usb ? "commands: info | status | devices | scan | paired | pair <slot> <mac> [pin] | forget <slot> | "
                         + "mode <slot> line|raw | hold <slot> on|off | ack <slot> <epoch> <seq> | unbind | monitor on|off"
                   : "error unknown command")
         }

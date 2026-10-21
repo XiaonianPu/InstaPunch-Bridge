@@ -1,0 +1,29 @@
+Executing action: all (aliases: build)
+Running ninja in directory /Users/danielxnpu/InstaPunch-Bridge/build
+Executing "ninja all"...
+[1/9] Performing build step for 'bootloader'
+[1/1] cd /Users/danielxnpu/InstaPunch-Bridge/build/bootloader/esp-idf/esptool_py && /Users/danielxnpu/.espressif/python_env/idf5.4_py3.9_env/bin/python /Users/danielxnpu/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x1000 /Users/danielxnpu/InstaPunch-Bridge/build/bootloader/bootloader.bin
+Bootloader binary size 0x6570 bytes. 0xa90 bytes (9%) free.
+[2/9] No install step for 'bootloader'
+[3/9] Completed 'bootloader'
+[4/9] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/links.c.obj
+[5/9] Linking C static library esp-idf/main/libmain.a
+[6/9] Generating ld/sections.ld
+[7/9] Linking CXX executable instapunch_bridge.elf
+[8/9] Generating binary image from built executable
+esptool.py v4.12.0
+Creating esp32 image...
+Merged 2 ELF sections
+Successfully created esp32 image.
+Generated /Users/danielxnpu/InstaPunch-Bridge/build/instapunch_bridge.bin
+[9/9] cd /Users/danielxnpu/InstaPunch-Bridge/build/esp-idf/esptool_py && /Users/danielxnpu/.espressif/python_env/idf5.4_py3.9_env/bin/python /Users/danielxnpu/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /Users/danielxnpu/InstaPunch-Bridge/build/partition_table/partition-table.bin /Users/danielxnpu/InstaPunch-Bridge/build/instapunch_bridge.bin
+instapunch_bridge.bin binary size 0xe8d60 bytes. Smallest app partition is 0x300000 bytes. 0x2172a0 bytes (70%) free.
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 4MB --flash_freq 40m 0x1000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/instapunch_bridge.bin
+or from the "/Users/danielxnpu/InstaPunch-Bridge/build" directory
+ python -m esptool --chip esp32 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"

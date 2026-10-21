@@ -1,0 +1,5 @@
+cc -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -Wno-unused-parameter -Istubs -I../main -o test_links test_links.c ../main/device_cache.c
+./test_frame
+frame tests passed
+./test_links
+links/cache: 11 scenarios passed

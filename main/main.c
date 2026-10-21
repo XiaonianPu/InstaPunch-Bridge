@@ -52,6 +52,7 @@ void app_main(void)
     bridge_command_load_options();
     ESP_ERROR_CHECK(ble_server_start(on_ble_command));
     ESP_ERROR_CHECK(links_start(on_device_data));
+    bridge_command_start_publisher();
     console_start();
     ESP_LOGI(TAG, "free heap %u bytes, minimum %u", (unsigned)esp_get_free_heap_size(),
              (unsigned)esp_get_minimum_free_heap_size());

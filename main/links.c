@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_gap_bt_api.h"
+#include "esp_timer.h"
+#include "device_cache.h"
 #include "esp_log.h"
 #include "ble_server.h"
 #include "esp_spp_api.h"
@@ -34,6 +36,7 @@ typedef struct {
     bool closing; // disconnect requested; state stays CONNECTED until ESP_SPP_CLOSE_EVT
     TickType_t next_try;
     char name[32];
+    uint8_t scn; // successful SDP channel, reused until an open fails
 } link_t;
 
 static link_t s_links[BRIDGE_SLOT_COUNT];
@@ -44,6 +47,12 @@ static SemaphoreHandle_t s_lock;
 // ESP_SPP_DISCOVERY_COMP_EVT does not say which peer it belongs to.
 static int s_dialing = -1;
 static TickType_t s_dial_started;
+static esp_bd_addr_t s_dial_mac;
+static uint32_t s_dial_handle;
+static bool s_dial_warned;
+static bool s_dial_cancelled;
+static int s_next_slot;
+static bridge_device_cache_t s_cache;
 
 static bool s_scan_pending;
 static bool s_scan_running;
@@ -95,8 +104,9 @@ static void mark_idle(int slot)
 static void request_close(int slot)
 {
     if (s_links[slot].state == LINK_CONNECTED && !s_links[slot].closing) {
-        s_links[slot].closing = true;
-        esp_spp_disconnect(s_links[slot].handle);
+        esp_err_t err = esp_spp_disconnect(s_links[slot].handle);
+        s_links[slot].closing = err == ESP_OK;
+        if (err != ESP_OK) ESP_LOGW(TAG, "disconnect rejected: %s", esp_err_to_name(err));
     }
 }
 
@@ -104,6 +114,13 @@ static void start_scan_if_pending(void)
 {
     if (!s_scan_pending || s_dialing >= 0) {
         return;
+    }
+    // Wait for the actual close callbacks, not just disconnect requests.
+    for (int i = 0; i < BRIDGE_SLOT_COUNT; i++) {
+        if (s_links[i].state == LINK_CONNECTED) {
+            request_close(i);
+            return;
+        }
     }
     s_scan_pending = false;
     s_scan_running = true;
@@ -121,6 +138,7 @@ static void start_scan_if_pending(void)
 static void finish_dial(void)
 {
     s_dialing = -1;
+    s_dial_handle = 0;
     start_scan_if_pending();
 }
 
@@ -130,17 +148,28 @@ static void dial_next(void)
         return;
     }
     TickType_t now = xTaskGetTickCount();
-    for (int i = 0; i < BRIDGE_SLOT_COUNT; i++) {
+    for (int n = 0; n < BRIDGE_SLOT_COUNT; n++) {
+        int i = (s_next_slot + n) % BRIDGE_SLOT_COUNT;
         link_t *link = &s_links[i];
         if (!link->device.valid || link->state != LINK_IDLE || (int32_t)(now - link->next_try) < 0) {
             continue;
         }
-        link->state = LINK_DISCOVERING;
+        link->state = link->scn ? LINK_CONNECTING : LINK_DISCOVERING;
         s_dialing = i;
+        s_next_slot = (i + 1) % BRIDGE_SLOT_COUNT;
         s_dial_started = now;
-        ESP_LOGI(TAG, "%s: discovering " ESP_BD_ADDR_STR, bridge_config_slot_name(i),
-                 ESP_BD_ADDR_HEX(link->device.mac));
-        if (esp_spp_start_discovery(link->device.mac) != ESP_OK) {
+        s_dial_warned = false;
+        s_dial_cancelled = false;
+        s_dial_handle = 0;
+        memcpy(s_dial_mac, link->device.mac, ESP_BD_ADDR_LEN);
+        ESP_LOGI(TAG, "%s: %s " ESP_BD_ADDR_STR, bridge_config_slot_name(i),
+                 link->scn ? "connecting cached channel" : "discovering", ESP_BD_ADDR_HEX(link->device.mac));
+        esp_err_t err = link->scn
+            ? esp_spp_connect(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_MASTER, link->scn, s_dial_mac)
+            : esp_spp_start_discovery(s_dial_mac);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "%s: dial request rejected: %s", bridge_config_slot_name(i), esp_err_to_name(err));
+            link->scn = 0;
             mark_idle(i);
             finish_dial();
         }
@@ -148,21 +177,28 @@ static void dial_next(void)
     }
 }
 
+static void manager_tick(void)
+{
+    lock();
+    if (s_dialing >= 0 && !s_dial_warned && xTaskGetTickCount() - s_dial_started > DIAL_TIMEOUT) {
+        // ESP-IDF SDP itself has a 30 s inactivity timeout. Its result has no
+        // peer ID, so releasing this slot here would misattribute late results.
+        s_dial_warned = true;
+        ESP_LOGW(TAG, "%s: dial slow; waiting for stack completion", bridge_config_slot_name(s_dialing));
+    }
+    if (s_name_next >= 0 && xTaskGetTickCount() - s_name_started > NAME_LOOKUP_TIMEOUT) {
+        ESP_LOGW(TAG, "remote name request timed out");
+        name_lookup_next();
+    }
+    start_scan_if_pending();
+    dial_next();
+    unlock();
+}
+
 static void manager_task(void *arg)
 {
     for (;;) {
-        lock();
-        if (s_dialing >= 0 && xTaskGetTickCount() - s_dial_started > DIAL_TIMEOUT) {
-            ESP_LOGW(TAG, "%s: dial timed out", bridge_config_slot_name(s_dialing));
-            mark_idle(s_dialing);
-            finish_dial();
-        }
-        if (s_name_next >= 0 && xTaskGetTickCount() - s_name_started > NAME_LOOKUP_TIMEOUT) {
-            ESP_LOGW(TAG, "remote name request timed out");
-            name_lookup_next();
-        }
-        dial_next();
-        unlock();
+        manager_tick();
         vTaskDelay(TICK_MS(1000));
     }
 }
@@ -207,18 +243,19 @@ static bool eir_has_spp(uint8_t *eir)
 
 static void scan_result(esp_bt_gap_cb_param_t *param)
 {
-    if (!s_scan_running || s_name_next >= 0 || seen_find(param->disc_res.bda)) {
+    if (!s_scan_running || s_name_next >= 0) {
         return;
     }
-    scan_seen_t *entry = NULL;
-    if (s_scan_seen_count < SCAN_SEEN_MAX) {
+    scan_seen_t *entry = seen_find(param->disc_res.bda);
+    if (!entry && s_scan_seen_count < SCAN_SEEN_MAX) {
         entry = &s_scan_seen[s_scan_seen_count++];
         memcpy(entry->bda, param->disc_res.bda, ESP_BD_ADDR_LEN);
         entry->name[0] = '\0';
     }
 
     char name[32] = "";
-    int rssi = 0;
+    bridge_seen_device_t *known = bridge_cache_find(&s_cache, param->disc_res.bda);
+    int rssi = known ? known->rssi : 0;
     uint32_t cod = 0;
     bool spp = false;
     for (int i = 0; i < param->disc_res.num_prop; i++) {
@@ -247,9 +284,16 @@ static void scan_result(esp_bt_gap_cb_param_t *param)
             }
         }
     }
-    if (entry) {
-        strlcpy(entry->name, name, sizeof(entry->name));
-    }
+    bridge_seen_device_t observation = {.rssi = rssi, .cod = cod, .spp = spp,
+        .seen_ms = (uint64_t)(esp_timer_get_time() / 1000)};
+    memcpy(observation.mac, param->disc_res.bda, ESP_BD_ADDR_LEN);
+    strlcpy(observation.name, name, sizeof(observation.name));
+    bridge_cache_observe(&s_cache, &observation);
+    bridge_seen_device_t *cached = bridge_cache_find(&s_cache, observation.mac);
+    strlcpy(name, cached->name, sizeof(name));
+    cod = cached->cod;
+    spp = cached->spp;
+    if (entry) strlcpy(entry->name, name, sizeof(entry->name));
     char line[96];
     snprintf(line, sizeof(line), "found " ESP_BD_ADDR_STR " %d %06" PRIx32 " %s %s %s",
              ESP_BD_ADDR_HEX(param->disc_res.bda), rssi, cod & 0xffffff, cod_class(cod), spp ? "spp" : "-", name);
@@ -294,13 +338,18 @@ static void name_result(esp_bt_gap_cb_param_t *param)
     scan_seen_t *entry = seen_find(param->read_rmt_name.bda);
     if (entry && param->read_rmt_name.stat == ESP_BT_STATUS_SUCCESS && param->read_rmt_name.rmt_name[0]) {
         strlcpy(entry->name, (const char *)param->read_rmt_name.rmt_name, sizeof(entry->name));
+        bridge_seen_device_t *cached = bridge_cache_find(&s_cache, entry->bda);
+        if (cached) strlcpy(cached->name, entry->name, sizeof(cached->name));
         char line[80];
         snprintf(line, sizeof(line), "name " ESP_BD_ADDR_STR " %s", ESP_BD_ADDR_HEX(entry->bda), entry->name);
         if (s_scan_reply) {
             s_scan_reply(line);
         }
     }
-    name_lookup_next();
+    if (s_name_next > 0 && s_name_next <= s_scan_seen_count &&
+        memcmp(s_scan_seen[s_name_next - 1].bda, param->read_rmt_name.bda, ESP_BD_ADDR_LEN) == 0) {
+        name_lookup_next();
+    }
 }
 
 static void gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
@@ -383,30 +432,58 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
         if (slot < 0 || s_links[slot].state != LINK_DISCOVERING) {
             break;
         }
-        if (param->disc_comp.status == ESP_SPP_SUCCESS && param->disc_comp.scn_num > 0) {
+        ESP_LOGI(TAG, "%s: SDP status=%d channels=%u", bridge_config_slot_name(slot),
+                 param->disc_comp.status, param->disc_comp.scn_num);
+        if (!s_dial_cancelled && param->disc_comp.status == ESP_SPP_SUCCESS && param->disc_comp.scn_num > 0) {
+            s_links[slot].scn = param->disc_comp.scn[0];
             s_links[slot].state = LINK_CONNECTING;
-            esp_spp_connect(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_MASTER, param->disc_comp.scn[0],
-                            s_links[slot].device.mac);
+            esp_err_t err = esp_spp_connect(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_MASTER,
+                                            s_links[slot].scn, s_dial_mac);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "connect rejected: %s", esp_err_to_name(err));
+                s_links[slot].scn = 0;
+                mark_idle(slot);
+                finish_dial();
+            }
         } else {
             mark_idle(slot);
             finish_dial();
         }
         break;
     }
+    case ESP_SPP_CL_INIT_EVT:
+        if (s_dialing >= 0) {
+            ESP_LOGI(TAG, "connect init status=%d handle=%" PRIu32, param->cl_init.status, param->cl_init.handle);
+            if (param->cl_init.status == ESP_SPP_SUCCESS) {
+                s_dial_handle = param->cl_init.handle;
+            } else {
+                // IDF v5.4.2 bta_jv_rfcomm_connect reports this failure without OPEN.
+                s_links[s_dialing].scn = 0;
+                mark_idle(s_dialing);
+                finish_dial();
+            }
+        }
+        break;
     case ESP_SPP_OPEN_EVT: {
         int slot = s_dialing;
-        bool wanted = slot >= 0 && s_links[slot].state == LINK_CONNECTING &&
+        if (slot < 0 || (s_dial_handle && param->open.handle && s_dial_handle != param->open.handle)) {
+            if (param->open.status == ESP_SPP_SUCCESS) esp_spp_disconnect(param->open.handle);
+            break;
+        }
+        ESP_LOGI(TAG, "%s: open status=%d handle=%" PRIu32, bridge_config_slot_name(slot),
+                 param->open.status, param->open.handle);
+        bool wanted = !s_dial_cancelled && s_links[slot].state == LINK_CONNECTING &&
                       memcmp(s_links[slot].device.mac, param->open.rem_bda, ESP_BD_ADDR_LEN) == 0;
         if (param->open.status != ESP_SPP_SUCCESS) {
-            if (slot >= 0) {
-                mark_idle(slot);
-            }
+            s_links[slot].scn = 0;
+            mark_idle(slot);
         } else if (!wanted) {
             // The slot was re-bound while dialling the old device.
-            esp_spp_disconnect(param->open.handle);
-            if (slot >= 0) {
-                mark_idle(slot);
-            }
+            s_links[slot].handle = param->open.handle;
+            s_links[slot].state = LINK_CONNECTED;
+            request_close(slot);
+            // Keep the dial owner until CLOSE so it cannot close a new attempt.
+            break;
         } else {
             s_links[slot].state = LINK_CONNECTED;
             s_links[slot].handle = param->open.handle;
@@ -420,13 +497,18 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     case ESP_SPP_CLOSE_EVT: {
         int slot = slot_by_handle(param->close.handle);
         if (slot >= 0) {
-            ESP_LOGW(TAG, "%s: link closed", bridge_config_slot_name(slot));
+            ESP_LOGW(TAG, "%s: link closed status=%d port=%" PRIu32 " async=%d requested=%d",
+                     bridge_config_slot_name(slot), param->close.status, param->close.port_status,
+                     param->close.async, s_links[slot].closing);
             mark_idle(slot);
             link_down = slot;
-        } else if (s_dialing >= 0 && s_links[s_dialing].state == LINK_CONNECTING) {
+            if (s_dialing == slot) finish_dial();
+        } else if (s_dialing >= 0 && s_dial_handle && param->close.handle == s_dial_handle) {
+            s_links[s_dialing].scn = 0;
             mark_idle(s_dialing);
             finish_dial();
         }
+        start_scan_if_pending();
         break;
     }
     case ESP_SPP_WRITE_EVT:
@@ -501,6 +583,8 @@ esp_err_t links_set_device(bridge_slot_t slot, const bridge_device_t *device)
         memset(&link->device, 0, sizeof(link->device));
     }
     link->name[0] = '\0';
+    link->scn = 0;
+    if (s_dialing == slot) s_dial_cancelled = true;
     request_close(slot);
     link->next_try = xTaskGetTickCount();
     bool still_used = old.valid && slot_by_mac(old.mac) >= 0;
@@ -576,4 +660,31 @@ void links_paired(bridge_reply_fn reply)
     }
     free(list);
     reply("paired done");
+}
+
+void links_cached(bridge_reply_fn reply)
+{
+    // Copy under the links lock; never call the BLE/command path while holding it.
+    bridge_device_cache_t *snapshot = malloc(sizeof(*snapshot));
+    if (!snapshot) { reply("devices unavailable"); return; }
+    lock();
+    *snapshot = s_cache;
+    bool scanning = s_scan_pending || s_scan_running;
+    unlock();
+    uint64_t now = (uint64_t)(esp_timer_get_time() / 1000);
+    char line[128];
+    snprintf(line, sizeof(line), "devices begin %u", (unsigned)snapshot->count);
+    reply(line);
+    reply(scanning ? "scan state running" : "scan state idle");
+    for (size_t i = 0; i < snapshot->count; i++) {
+        bridge_seen_device_t *d = &snapshot->devices[i];
+        snprintf(line, sizeof(line), "found " ESP_BD_ADDR_STR " %d %06" PRIx32 " %s %s %s",
+                 ESP_BD_ADDR_HEX(d->mac), d->rssi, d->cod & 0xffffff, cod_class(d->cod), d->spp ? "spp" : "-", d->name);
+        reply(line);
+        snprintf(line, sizeof(line), "seen " ESP_BD_ADDR_STR " %" PRIu64, ESP_BD_ADDR_HEX(d->mac), now - d->seen_ms);
+        reply(line);
+    }
+    snprintf(line, sizeof(line), "devices done %u", (unsigned)snapshot->count);
+    reply(line);
+    free(snapshot);
 }

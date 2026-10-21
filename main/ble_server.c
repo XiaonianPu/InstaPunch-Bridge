@@ -11,6 +11,9 @@
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "pipeline.h"
 #include "status_led.h"
 
@@ -87,6 +90,75 @@ static uint16_t s_mtu = 23;
 static bool s_notify_data;
 static bool s_notify_control;
 static TimerHandle_t s_pairing_timer;
+
+#define CONTROL_QUEUE_SIZE 96
+static QueueHandle_t s_control_queue;
+static SemaphoreHandle_t s_control_lock;
+static bool s_control_ready, s_control_busy, s_control_congested;
+static uint16_t s_control_conn, s_control_mtu;
+static TickType_t s_control_sent;
+static uint32_t s_control_overflow, s_control_generation;
+static bool s_gatt_congested;
+
+// This lock never encloses calls to pipeline or links (their locks can call us).
+static void sync_control(void)
+{
+    xSemaphoreTake(s_control_lock, portMAX_DELAY);
+    bool ready = s_connected && s_encrypted && s_notify_control;
+    if (!ready || (s_control_ready && s_control_conn != s_conn_id)) {
+        xQueueReset(s_control_queue);
+        s_control_busy = false;
+    }
+    if (ready && !s_control_ready) s_control_generation++;
+    s_control_ready = ready;
+    s_control_conn = s_conn_id;
+    s_control_mtu = s_mtu;
+    s_control_congested = s_gatt_congested;
+    xSemaphoreGive(s_control_lock);
+}
+
+static void control_confirm(esp_ble_gatts_cb_param_t *param)
+{
+    char discarded[CONTROL_MAX + 1];
+    xSemaphoreTake(s_control_lock, portMAX_DELAY);
+    if (s_control_busy && s_control_conn == param->conf.conn_id) {
+        if (param->conf.status == ESP_GATT_OK) xQueueReceive(s_control_queue, discarded, 0);
+        else ESP_LOGW(TAG, "control notify failed: %d; retaining line", param->conf.status);
+        s_control_busy = false;
+    }
+    xSemaphoreGive(s_control_lock);
+}
+
+static void control_task(void *arg)
+{
+    char line[CONTROL_MAX + 1];
+    for (;;) {
+        xSemaphoreTake(s_control_lock, portMAX_DELAY);
+        if (s_control_ready && s_control_busy && xTaskGetTickCount() - s_control_sent > pdMS_TO_TICKS(5000)) {
+            // Do not send another line: a late confirmation cannot be attributed
+            // safely. Reconnect, then the publisher rebuilds a current snapshot.
+            ESP_LOGW(TAG, "control confirmation timeout; reconnecting phone");
+            esp_ble_gap_disconnect(s_peer);
+            s_control_ready = false;
+        }
+        if (s_control_ready && !s_control_busy && !s_control_congested && xQueuePeek(s_control_queue, line, 0)) {
+            size_t len = strlen(line);
+            if (len > (size_t)s_control_mtu - 3) {
+                // Preserve one-notification-per-line v1 framing; never send a
+                // truncated MAC/status that a client could accept as valid.
+                xQueueReceive(s_control_queue, line, 0);
+                ESP_LOGW(TAG, "control line exceeds MTU %u", s_control_mtu);
+            } else if (esp_ble_gatts_send_indicate(s_gatts_if, s_control_conn, s_handles[IDX_CONTROL_VAL], len,
+                                                  (uint8_t *)line, false) == ESP_OK) {
+                s_control_busy = true;
+                s_control_sent = xTaskGetTickCount();
+            }
+        }
+        xSemaphoreGive(s_control_lock);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
 
 // "InstaPunch-Bridge-XXXX": 22 characters, so the scan response is 24 of 31 bytes.
 static char s_name[24];
@@ -172,6 +244,7 @@ static void gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
     default:
         break;
     }
+    sync_control();
 }
 
 static void handle_write(esp_ble_gatts_cb_param_t *param)
@@ -221,6 +294,7 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble
         break;
     case ESP_GATTS_CONNECT_EVT:
         s_connected = true;
+        s_gatt_congested = false;
         status_led_set_phone(true);
         s_encrypted = false;
         s_notify_data = false;
@@ -234,6 +308,7 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble
         xTimerStart(s_pairing_timer, 0);
         break;
     case ESP_GATTS_DISCONNECT_EVT:
+        ESP_LOGW(TAG, "phone disconnected reason=0x%x", param->disconnect.reason);
         s_connected = false;
         status_led_set_phone(false);
         s_encrypted = false;
@@ -248,11 +323,13 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble
         pipeline_mtu(s_mtu);
         break;
     case ESP_GATTS_CONF_EVT:
+        if (param->conf.handle == s_handles[IDX_CONTROL_VAL]) control_confirm(param);
         if (param->conf.handle == s_handles[IDX_DATA_VAL]) {
             pipeline_notify_done(param->conf.value, param->conf.len, param->conf.status == ESP_GATT_OK);
         }
         break;
     case ESP_GATTS_CONGEST_EVT:
+        s_gatt_congested = param->congest.congested;
         pipeline_congested(param->congest.congested);
         break;
     case ESP_GATTS_WRITE_EVT:
@@ -261,6 +338,7 @@ static void gatts_cb(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble
     default:
         break;
     }
+    sync_control();
 }
 
 esp_err_t ble_server_notify_data(const uint8_t *frame, size_t len)
@@ -274,13 +352,29 @@ esp_err_t ble_server_notify_data(const uint8_t *frame, size_t len)
 
 void ble_server_send_control(const char *line)
 {
-    if (!(s_connected && s_encrypted && s_notify_control)) {
+    char copy[CONTROL_MAX + 1];
+    if (strlen(line) > CONTROL_MAX) {
+        ESP_LOGW(TAG, "control line too long; rejected");
         return;
     }
-    size_t len = strlen(line);
-    size_t max = (size_t)s_mtu - 3;
-    esp_ble_gatts_send_indicate(s_gatts_if, s_conn_id, s_handles[IDX_CONTROL_VAL],
-                                (uint16_t)(len < max ? len : max), (uint8_t *)line, false);
+    strlcpy(copy, line, sizeof(copy));
+    xSemaphoreTake(s_control_lock, portMAX_DELAY);
+    if (s_control_ready && xQueueSend(s_control_queue, copy, 0) != pdTRUE) {
+        if ((s_control_overflow++ % 32) == 0) ESP_LOGW(TAG, "control queue full; next snapshot will refresh state");
+    }
+    xSemaphoreGive(s_control_lock);
+}
+
+bool ble_server_snapshot_ready(uint32_t *generation)
+{
+    xSemaphoreTake(s_control_lock, portMAX_DELAY);
+    // A complete 24-device snapshot is 51 lines, plus status/paired. Never
+    // accumulate periodic snapshots behind congestion or a small MTU.
+    *generation = s_control_generation;
+    bool ready = s_control_ready && s_control_mtu >= CONTROL_MAX + 3 &&
+                 !s_control_congested && uxQueueMessagesWaiting(s_control_queue) == 0 && !s_control_busy;
+    xSemaphoreGive(s_control_lock);
+    return ready;
 }
 
 void ble_server_status(char *out, size_t size)
@@ -321,6 +415,10 @@ esp_err_t ble_server_unbind_all(void)
 esp_err_t ble_server_start(ble_command_cb on_command)
 {
     s_on_command = on_command;
+    s_control_lock = xSemaphoreCreateMutex();
+    s_control_queue = xQueueCreate(CONTROL_QUEUE_SIZE, CONTROL_MAX + 1);
+    if (!s_control_lock || !s_control_queue) return ESP_ERR_NO_MEM;
+    if (xTaskCreate(control_task, "ble_control", 3072, NULL, 5, NULL) != pdPASS) return ESP_ERR_NO_MEM;
     s_pairing_timer = xTimerCreate("ble_pair", PAIRING_TIMEOUT, pdFALSE, NULL, pairing_timeout);
 
     uint8_t mac[6];

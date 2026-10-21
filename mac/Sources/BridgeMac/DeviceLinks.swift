@@ -74,6 +74,7 @@ final class DeviceLinks: NSObject, PipelineLinks, IOBluetoothRFCOMMChannelDelega
     private var reported: Set<String> = [] // MACs already sent as "found" in this scan
     private var inquiry: IOBluetoothDeviceInquiry?
     private var manager: DispatchSourceTimer?
+    private var cached: [String: (line: String, seen: Date)] = [:]
 
     init(queue: DispatchQueue, pipeline: Pipeline) {
         self.queue = queue
@@ -463,11 +464,15 @@ final class DeviceLinks: NSObject, PipelineLinks, IOBluetoothRFCOMMChannelDelega
         } else {
             scanResults.append(ScanResult(id: mac, name: name, rssi: rssi, paired: device.isPaired()))
         }
-        guard reported.insert(mac).inserted else { return } // once per scan
         let cod = device.classOfDevice & 0xffffff
         // macOS exposes no EIR; only an SDP record it already cached counts as "spp".
         let spp = device.getServiceRecord(for: Self.sppUUID) != nil
-        scanReply?(String(format: "found %@ %d %06x %@ %@ %@", mac, rssi, cod, Self.codClass(cod), spp ? "spp" : "-", name))
+        let line = String(format: "found %@ %d %06x %@ %@ %@", mac, rssi, cod, Self.codClass(cod), spp ? "spp" : "-", name)
+        if cached[mac] == nil, cached.count >= 24, let oldest = cached.min(by: { $0.value.seen < $1.value.seen })?.key {
+            cached.removeValue(forKey: oldest)
+        }
+        cached[mac] = (line, Date())
+        scanReply?(line)
     }
 
     // Major device class names, as in links.c cod_class().
@@ -484,7 +489,21 @@ final class DeviceLinks: NSObject, PipelineLinks, IOBluetoothRFCOMMChannelDelega
         let name = device.name ?? ""
         guard !name.isEmpty, name != scanResults[k].name else { return }
         scanResults[k].name = name
+        if let entry = cached[mac] {
+            let prefix = entry.line.split(separator: " ", maxSplits: 6).prefix(6).joined(separator: " ")
+            cached[mac] = (prefix + " " + name, entry.seen)
+        }
         scanReply?("name \(mac) \(name)")
+    }
+
+    func cachedDevices(reply: (String) -> Void) {
+        reply("devices begin \(cached.count)")
+        reply(scanning || scanPending ? "scan state running" : "scan state idle")
+        for (mac, entry) in cached.sorted(by: { $0.key < $1.key }) {
+            reply(entry.line)
+            reply("seen \(mac) \(max(0, Int(Date().timeIntervalSince(entry.seen) * 1000)))")
+        }
+        reply("devices done \(cached.count)")
     }
 
     // `paired`: on the Mac these are the devices paired with macOS itself.

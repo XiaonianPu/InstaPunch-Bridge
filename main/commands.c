@@ -6,6 +6,8 @@
 #include <string.h>
 #include "ble_server.h"
 #include "pipeline.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static bool s_monitoring;
 
@@ -137,6 +139,8 @@ void bridge_command_run(char *line, bridge_reply_fn reply, bool usb)
         if (links_scan(reply) != ESP_OK) {
             reply("error scan already running");
         }
+    } else if (strcmp(cmd, "devices") == 0) {
+        links_cached(reply);
     } else if (strcmp(cmd, "paired") == 0) {
         links_paired(reply);
     } else if (strcmp(cmd, "pair") == 0) {
@@ -156,7 +160,7 @@ void bridge_command_run(char *line, bridge_reply_fn reply, bool usb)
         s_monitoring = arg && strcmp(arg, "on") == 0;
         reply("ok");
     } else {
-        reply(usb ? "commands: info | status | scan | paired | pair <slot> <mac> [pin] | forget <slot> | "
+        reply(usb ? "commands: info | status | devices | scan | paired | pair <slot> <mac> [pin] | forget <slot> | "
                     "mode <slot> line|raw | hold <slot> on|off | unbind | monitor on|off"
                   : "error unknown command");
     }
@@ -174,4 +178,31 @@ void bridge_command_load_options(void)
         bridge_config_load_options((bridge_slot_t)i, &options);
         pipeline_configure((bridge_slot_t)i, (frame_mode_t)options.mode, options.hold);
     }
+}
+
+static void publish_task(void *arg)
+{
+    TickType_t last = 0;
+    bool published = false;
+    uint32_t last_generation = 0;
+    for (;;) {
+        TickType_t now = xTaskGetTickCount();
+        // When the phone is absent, do not build or queue obsolete snapshots.
+        uint32_t generation;
+        if (ble_server_snapshot_ready(&generation) && (!published || generation != last_generation || now - last >= pdMS_TO_TICKS(5000))) {
+            links_cached(ble_server_send_control);
+            status(ble_server_send_control);
+            links_paired(ble_server_send_control);
+            last = now;
+            last_generation = generation;
+            published = true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(250));
+    }
+}
+
+void bridge_command_start_publisher(void)
+{
+    // Snapshot publishing runs separately from Bluetooth callbacks.
+    configASSERT(xTaskCreate(publish_task, "bridge_status", 6144, NULL, 4, NULL) == pdPASS);
 }

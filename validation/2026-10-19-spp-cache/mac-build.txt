@@ -1,0 +1,38 @@
+Building for debugging...
+[Planning deferred tasks]
+[1 / 1]
+[3 / 8] BridgeFrame
+[9 / 17]
+[10 / 17]
+[11 / 17]
+[13 / 17] BridgeFrame
+[14 / 17] BridgeFrame
+[14 / 18] BridgeMac-product
+[24 / 97]
+[25 / 97]
+[27 / 97]
+[36 / 97]
+[38 / 97]
+[39 / 97]
+[43 / 97]
+[44 / 97]
+[46 / 97]
+[49 / 97]
+[51 / 97]
+[56 / 97]
+[59 / 97]
+[61 / 97]
+[62 / 97]
+[73 / 97]
+[75 / 97]
+[76 / 97]
+[77 / 97]
+[80 / 97]
+[82 / 97]
+[93 / 97] BridgeMac-product
+[94 / 97] BridgeMac-product
+[96 / 97] BridgeMac-product
+[98 / 98] BridgeMac-product
+Build complete! (15.36秒)
+build/InstaPunch-Bridge-Mac.app: replacing existing signature
+build/InstaPunch-Bridge-Mac.app

@@ -162,3 +162,9 @@ In principle any classic-Bluetooth SPP device. Planned tests: South Galaxy G1 RT
 ## 11. Open source and license
 
 The firmware is released under the MIT License; the source code is in the project repository. It is published for use only and does not accept external pull requests; fork it to make your own changes. Released firmware images also contain ESP-IDF components and Espressif's Bluetooth controller libraries under their own licenses. Developers: see the [developer guide (Chinese)](development.md).
+
+## Automatic device updates (firmware 0.1.1)
+
+After the phone subscribes on an encrypted connection, the bridge sends its cached device list, current slot status and paired devices, then refreshes them every 5 seconds. This works without a recent search and does not start inquiry or disconnect SPP. The USB command `devices` requests the same cache.
+
+The RAM cache keeps up to 24 recently discovered devices across searches and clears on reboot; saved pairings remain. Discovery age and RSSI refer to the last radio observation, not current availability. Slot status reports actual connections. Manual search still temporarily disconnects the slots. Reconnection reuses the known RFCOMM channel and falls back to service discovery after failure. Weak-signal recovery on a physical board remains unverified for 0.1.1. Complete periodic snapshots need ATT MTU 131 or greater; protocol v1 framing and UUIDs remain compatible.

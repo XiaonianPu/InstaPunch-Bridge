@@ -120,7 +120,7 @@ Do the same if the same phone was reset or forgot the bridge in its Bluetooth se
 | Command | Purpose |
 |---|---|
 | `info` | Firmware and protocol version |
-| `status` | Device, link state, mode and dropped bytes per slot, and the phone state |
+| `status` | Device, link state, mode, dropped bytes and signal (`rssi=`: 0 = ideal range, negative = dB weaker) per slot, and the phone state |
 | `scan` | Search for nearby classic-Bluetooth devices (about 10 s, then name lookups) |
 | `paired` | List devices paired with the bridge |
 | `pair <slot> <MAC> [PIN]` | Bind a device to slot 1 or 2; takes effect immediately |

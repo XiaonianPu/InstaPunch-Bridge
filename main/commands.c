@@ -33,6 +33,15 @@ static void status(bridge_reply_fn reply)
                      pipe.hold ? 1 : 0, pipe.epoch, pipe.down_lost, pipe.up_lost, link.name);
         }
         reply(line);
+        if (link.valid) {
+            // Separate line so older apps, which take the rest of the slot line as the name, skip it.
+            if (link.has_rssi) {
+                snprintf(line, sizeof(line), "%s rssi=%d", bridge_config_slot_name(i), link.rssi_delta);
+            } else {
+                snprintf(line, sizeof(line), "%s rssi=-", bridge_config_slot_name(i));
+            }
+            reply(line);
+        }
     }
     ble_server_status(line, sizeof(line));
     reply(line);

@@ -26,6 +26,8 @@ typedef struct {
     esp_bd_addr_t mac;
     const char *state; // "idle" | "dialing" | "connected"
     char name[32];
+    bool has_rssi;      // a reading from the last 10 s of a connected link
+    int8_t rssi_delta;  // dB outside the golden receive range (-45..-20 dBm), 0 = inside
 } links_info_t;
 
 void links_info(bridge_slot_t slot, links_info_t *out);

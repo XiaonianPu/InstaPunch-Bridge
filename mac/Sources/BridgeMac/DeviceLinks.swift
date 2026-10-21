@@ -105,6 +105,16 @@ final class DeviceLinks: NSObject, PipelineLinks, IOBluetoothRFCOMMChannelDelega
         return (l.device, l.state, l.bt?.name ?? l.device?.name ?? "")
     }
 
+    /// Same meaning as the firmware's HCI Read RSSI: dB outside the ESP32 golden range (-45…-20 dBm), 0 inside.
+    /// macOS answers in absolute dBm, so it is mapped onto that range; nil when not connected or unknown (127).
+    func rssiDelta(_ i: Int) -> Int? {
+        let l = links[i]
+        guard l.state == "connected", let bt = l.bt, bt.isConnected() else { return nil }
+        let raw = Int(bt.rawRSSI())
+        guard raw != 127 else { return nil }
+        return raw < -45 ? raw + 45 : raw > -20 ? raw + 20 : 0
+    }
+
     func knownName(_ mac: String) -> String? {
         scanResults.first { $0.id == mac }?.name ?? IOBluetoothDevice(addressString: mac)?.name
     }

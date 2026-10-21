@@ -38,7 +38,7 @@ typedef void *SemaphoreHandle_t;
 #define ESP_BT_EIR_TYPE_CMPL_LOCAL_NAME 3
 #define ESP_BT_EIR_TYPE_SHORT_LOCAL_NAME 4
 enum { ESP_BT_GAP_DEV_PROP_RSSI, ESP_BT_GAP_DEV_PROP_COD, ESP_BT_GAP_DEV_PROP_BDNAME, ESP_BT_GAP_DEV_PROP_EIR };
-typedef enum { ESP_BT_GAP_DISC_RES_EVT, ESP_BT_GAP_DISC_STATE_CHANGED_EVT, ESP_BT_GAP_READ_REMOTE_NAME_EVT, ESP_BT_GAP_AUTH_CMPL_EVT, ESP_BT_GAP_PIN_REQ_EVT, ESP_BT_GAP_CFM_REQ_EVT } esp_bt_gap_cb_event_t;
+typedef enum { ESP_BT_GAP_DISC_RES_EVT, ESP_BT_GAP_DISC_STATE_CHANGED_EVT, ESP_BT_GAP_READ_REMOTE_NAME_EVT, ESP_BT_GAP_AUTH_CMPL_EVT, ESP_BT_GAP_PIN_REQ_EVT, ESP_BT_GAP_CFM_REQ_EVT, ESP_BT_GAP_READ_RSSI_DELTA_EVT } esp_bt_gap_cb_event_t;
 typedef struct { int type, len; void *val; } esp_bt_gap_dev_prop_t;
 typedef union {
  struct { uint8_t bda[6]; int num_prop; esp_bt_gap_dev_prop_t *prop; } disc_res;
@@ -47,6 +47,7 @@ typedef union {
  struct { uint8_t bda[6]; int stat; char device_name[249]; } auth_cmpl;
  struct { uint8_t bda[6]; bool min_16_digit; } pin_req;
  struct { uint8_t bda[6]; } cfm_req;
+ struct { uint8_t bda[6]; int stat; int8_t rssi_delta; } read_rssi_delta;
 } esp_bt_gap_cb_param_t;
 typedef enum { ESP_SPP_INIT_EVT, ESP_SPP_DISCOVERY_COMP_EVT, ESP_SPP_OPEN_EVT, ESP_SPP_CLOSE_EVT, ESP_SPP_WRITE_EVT, ESP_SPP_CONG_EVT, ESP_SPP_DATA_IND_EVT, ESP_SPP_CL_INIT_EVT } esp_spp_cb_event_t;
 typedef union {
@@ -60,7 +61,7 @@ typedef union {
 } esp_spp_cb_param_t;
 typedef struct { int mode; bool enable_l2cap_ertm; int tx_buffer_size; } esp_spp_cfg_t;
 extern TickType_t mock_ticks;
-extern int mock_discovers, mock_connects, mock_disconnects, mock_scans;
+extern int mock_discovers, mock_connects, mock_disconnects, mock_scans, mock_rssi_reads;
 extern esp_err_t mock_connect_result;
 static inline void mock_log(const char *tag, const char *fmt, ...) { (void)tag; (void)fmt; }
 #define ESP_LOGI mock_log
@@ -79,6 +80,7 @@ static inline int esp_spp_connect(int sec, int role, uint8_t scn, uint8_t *mac) 
 static inline int esp_spp_start_discovery(uint8_t *mac) { mock_discovers++; return ESP_OK; }
 static inline int esp_bt_gap_start_discovery(int m,int l,int n) { mock_scans++; return ESP_OK; }
 static inline int esp_bt_gap_read_remote_name(uint8_t *mac) { return ESP_OK; }
+static inline int esp_bt_gap_read_rssi_delta(uint8_t *mac) { mock_rssi_reads++; return ESP_OK; }
 static inline uint32_t esp_bt_gap_get_cod_major_dev(uint32_t cod) { return (cod >> 8) & 31; }
 static inline uint8_t *esp_bt_gap_resolve_eir_data(uint8_t *e,int type,uint8_t *len) { return NULL; }
 static inline int esp_bt_gap_pin_reply(uint8_t *m,bool a,int len,uint8_t *p) { return ESP_OK; }

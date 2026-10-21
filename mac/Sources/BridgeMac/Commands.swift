@@ -41,6 +41,8 @@ final class Commands {
             }
             reply("\(i + 1) \(device.mac ?? "virtual") \(state) \(p.raw ? "raw" : "line") hold=\(p.hold ? 1 : 0) "
                   + "epoch=\(p.epoch) lost=\(p.downLost)/\(p.upLost) \(name)")
+            // Separate line: older apps take the rest of the slot line as the device name.
+            reply("\(i + 1) rssi=" + (links.rssiDelta(i).map(String.init) ?? "-"))
         }
         reply(phone.status())
     }

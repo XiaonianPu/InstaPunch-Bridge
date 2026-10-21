@@ -4,7 +4,7 @@
 #include <string.h>
 #include "../main/links.c"
 TickType_t mock_ticks;
-int mock_discovers, mock_connects, mock_disconnects, mock_scans;
+int mock_discovers, mock_connects, mock_disconnects, mock_scans, mock_rssi_reads;
 esp_err_t mock_connect_result;
 static int up_count;
 esp_err_t bridge_config_load(bridge_slot_t slot, bridge_device_t *out) { return ESP_OK; }
@@ -22,7 +22,7 @@ static void reset(void) {
  memset(s_links,0,sizeof(s_links)); memset(&s_cache,0,sizeof(s_cache));
  s_dialing=-1; s_dial_handle=0; s_dial_cancelled=false; s_dial_warned=false; s_next_slot=0;
  s_scan_pending=false; s_scan_running=false; s_name_next=-1; s_scan_reply=NULL;
- s_scan_seen_count=0; mock_ticks=0; mock_discovers=mock_connects=mock_disconnects=mock_scans=up_count=0;
+ s_scan_seen_count=0; mock_ticks=0; mock_discovers=mock_connects=mock_disconnects=mock_scans=mock_rssi_reads=up_count=0; s_rssi_polled=0;
  mock_connect_result=ESP_OK; output[0]=0;
  s_links[0].device.valid=true; s_links[0].device.mac[5]=1;
  s_links[1].device.valid=true; s_links[1].device.mac[5]=2;
@@ -75,5 +75,14 @@ int main(void) {
  gap=(esp_bt_gap_cb_param_t){0}; gap.disc_res.bda[5]=1; gap.disc_res.num_prop=1; gap.disc_res.prop=&prop;
  scan_result(&gap); prop=(esp_bt_gap_dev_prop_t){.type=ESP_BT_GAP_DEV_PROP_BDNAME,.len=5,.val="Laser"};
  scan_result(&gap); assert(s_cache.count==1 && s_cache.devices[0].rssi==-75 && !strcmp(s_cache.devices[0].name,"Laser"));
- puts("links/cache: 11 scenarios passed");
+ reset(); mock_ticks=1000; manager_tick(); discovered(); opened(50); links_info_t info;
+ links_info(0,&info); assert(!info.has_rssi); // no reading yet
+ mock_ticks=4000; manager_tick(); assert(mock_rssi_reads==1); // only the connected slot is polled
+ gap=(esp_bt_gap_cb_param_t){0}; gap.read_rssi_delta.bda[5]=1; gap.read_rssi_delta.rssi_delta=-7;
+ gap_cb(ESP_BT_GAP_READ_RSSI_DELTA_EVT,&gap); links_info(0,&info); assert(info.has_rssi && info.rssi_delta==-7);
+ mock_ticks=4500; manager_tick(); assert(mock_rssi_reads==1); // at most every 2 s
+ mock_ticks=15000; links_info(0,&info); assert(!info.has_rssi); // stale after 10 s
+ p=(esp_spp_cb_param_t){0}; p.close.handle=50; spp_cb(ESP_SPP_CLOSE_EVT,&p);
+ gap_cb(ESP_BT_GAP_READ_RSSI_DELTA_EVT,&gap); links_info(0,&info); assert(!info.has_rssi); // late answer after close ignored
+ puts("links/cache: 12 scenarios passed");
 }

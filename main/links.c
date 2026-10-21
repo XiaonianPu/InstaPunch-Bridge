@@ -26,6 +26,8 @@ static const char *TAG = "links";
 #define NAME_LOOKUP_TIMEOUT TICK_MS(10000)
 #define SPP_UUID16 0x1101
 #define DEFAULT_PIN "0000"
+#define RSSI_PERIOD TICK_MS(2000)
+#define RSSI_STALE TICK_MS(10000)
 
 typedef enum { LINK_IDLE, LINK_DISCOVERING, LINK_CONNECTING, LINK_CONNECTED } link_state_t;
 
@@ -37,6 +39,9 @@ typedef struct {
     TickType_t next_try;
     char name[32];
     uint8_t scn; // successful SDP channel, reused until an open fails
+    int8_t rssi_delta; // HCI Read RSSI: dB outside the golden receive range, 0 = inside
+    bool has_rssi; // a reading on this connection
+    TickType_t rssi_at;
 } link_t;
 
 static link_t s_links[BRIDGE_SLOT_COUNT];
@@ -52,6 +57,7 @@ static uint32_t s_dial_handle;
 static bool s_dial_warned;
 static bool s_dial_cancelled;
 static int s_next_slot;
+static TickType_t s_rssi_polled;
 static bridge_device_cache_t s_cache;
 
 static bool s_scan_pending;
@@ -98,6 +104,7 @@ static void mark_idle(int slot)
     s_links[slot].state = LINK_IDLE;
     s_links[slot].handle = 0;
     s_links[slot].closing = false;
+    s_links[slot].has_rssi = false;
     s_links[slot].next_try = xTaskGetTickCount() + RETRY_DELAY;
 }
 
@@ -177,6 +184,19 @@ static void dial_next(void)
     }
 }
 
+// Classic links only report RSSI on request; the answer arrives as ESP_BT_GAP_READ_RSSI_DELTA_EVT.
+static void poll_rssi(void)
+{
+    TickType_t now = xTaskGetTickCount();
+    if (s_scan_running || now - s_rssi_polled < RSSI_PERIOD) return;
+    s_rssi_polled = now;
+    for (int i = 0; i < BRIDGE_SLOT_COUNT; i++) {
+        if (s_links[i].state == LINK_CONNECTED && !s_links[i].closing) {
+            esp_bt_gap_read_rssi_delta(s_links[i].device.mac);
+        }
+    }
+}
+
 static void manager_tick(void)
 {
     lock();
@@ -192,6 +212,7 @@ static void manager_tick(void)
     }
     start_scan_if_pending();
     dial_next();
+    poll_rssi();
     unlock();
 }
 
@@ -368,6 +389,15 @@ static void gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
     case ESP_BT_GAP_READ_REMOTE_NAME_EVT:
         name_result(param);
         break;
+    case ESP_BT_GAP_READ_RSSI_DELTA_EVT: {
+        int slot = slot_by_mac(param->read_rssi_delta.bda);
+        if (slot >= 0 && param->read_rssi_delta.stat == ESP_BT_STATUS_SUCCESS && s_links[slot].state == LINK_CONNECTED) {
+            s_links[slot].rssi_delta = param->read_rssi_delta.rssi_delta;
+            s_links[slot].has_rssi = true;
+            s_links[slot].rssi_at = xTaskGetTickCount();
+        }
+        break;
+    }
     case ESP_BT_GAP_AUTH_CMPL_EVT: {
         int slot = slot_by_mac(param->auth_cmpl.bda);
         if (param->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) {
@@ -616,6 +646,8 @@ void links_info(bridge_slot_t slot, links_info_t *out)
     memcpy(out->mac, link->device.mac, sizeof(out->mac));
     out->state = STATES[link->state];
     strlcpy(out->name, link->name, sizeof(out->name));
+    out->has_rssi = link->state == LINK_CONNECTED && link->has_rssi && xTaskGetTickCount() - link->rssi_at < RSSI_STALE;
+    out->rssi_delta = link->rssi_delta;
     unlock();
 }
 
